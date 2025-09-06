@@ -1,0 +1,30 @@
+{
+  "timeZone": "America/New_York",
+  "dependencies": {
+    "libraries": []
+  },
+  "exceptionLogging": "STACKDRIVER",
+  "runtimeVersion": "V8",
+  "dataStudio": {
+    "name": "Klaviyo Campaigns Connector",
+    "logoUrl": "https://static.vecteezy.com/system/resources/previews/035/746/056/original/google-app-logo-in-big-sur-style-3d-render-icon-design-concept-element-isolated-transparent-background-free-png.png",
+    "company": "rcorzogutierrez",
+    "companyUrl": "https://rcorzogutierrez.com",
+    "addonUrl": "https://github.com/rcorzogutierrez/klaviyo-connector-LookerStudio",
+    "supportUrl": "https://github.com/rcorzogutierrez/klaviyo-connector-LookerStudio/issues",
+    "description": "Conector para obtener datos de campañas de Klaviyo",
+    "sources": [
+      "Klaviyo Campaigns"
+    ],
+    "authType": [
+      "KEY"
+    ],
+    "feeType": [
+      "FREE"
+    ]
+  },
+  "webapp": {
+    "executeAs": "USER_DEPLOYING",
+    "access": "ANYONE_ANONYMOUS"
+  }
+}
