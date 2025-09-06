@@ -152,8 +152,6 @@ function getSchema(request) {
 // ============================================
 
 function getData(request) {
-  console.log('====== INICIO getData ======');
-  
   var apiKey = PropertiesService.getUserProperties().getProperty('dscc.klaviyo.apiKey');
   
   if (!apiKey) {
@@ -162,14 +160,14 @@ function getData(request) {
       .throwException();
   }
   
-  var url = "https://a.klaviyo.com/api/campaigns?filter=equals(messages.channel,'email')&fields[campaign]=name,status,created_at,updated_at,send_time";
+  var url = "https://a.klaviyo.com/api/campaigns?filter=equals(messages.channel,'email')&fields[campaign]=name,status,created_at,updated_at,send_time&fields[campaign-message]=definition.content.subject,definition.content.preview_text&include=campaign-messages";
   
   var options = {
     'method': 'GET',
     'headers': {
       'Authorization': 'Klaviyo-API-Key ' + apiKey,
       'Accept': 'application/json',
-      'revision': '2024-10-15'
+      'revision': '2025-07-15'
     },
     'muteHttpExceptions': true
   };
@@ -178,8 +176,6 @@ function getData(request) {
     var response = UrlFetchApp.fetch(url, options);
     
     if (response.getResponseCode() !== 200) {
-      console.error('Error - Status:', response.getResponseCode());
-      // IMPORTANTE: Crear schema vacío pero con la estructura correcta
       var emptySchema = [];
       request.fields.forEach(function(field) {
         emptySchema.push({
@@ -196,7 +192,6 @@ function getData(request) {
     var json = JSON.parse(response.getContentText());
     
     if (!json.data || !Array.isArray(json.data)) {
-      console.error('No data found');
       var emptySchema = [];
       request.fields.forEach(function(field) {
         emptySchema.push({
@@ -210,10 +205,6 @@ function getData(request) {
       };
     }
     
-    console.log('Campañas obtenidas:', json.data.length);
-    console.log('Campos solicitados:', request.fields.map(function(f) { return f.name; }).join(', '));
-    
-    // CREAR SCHEMA CON LA ESTRUCTURA CORRECTA
     var schema = [];
     request.fields.forEach(function(field) {
       schema.push({
@@ -222,11 +213,18 @@ function getData(request) {
       });
     });
     
-    // Mapear datos
     var rows = [];
     
     json.data.forEach(function(campaign) {
       var values = [];
+      
+      var message = null;
+      if (campaign.relationships && campaign.relationships['campaign-messages'] && campaign.relationships['campaign-messages'].data && json.included) {
+        var messageId = campaign.relationships['campaign-messages'].data[0].id;
+        message = json.included.find(function(item) {
+          return item.id === messageId && item.type === 'campaign-message';
+        });
+      }
       
       request.fields.forEach(function(requestedField) {
         var value = '';
@@ -237,15 +235,15 @@ function getData(request) {
             break;
             
           case 'campaign_name':
-            value = (campaign.attributes && campaign.attributes.name) ? campaign.attributes.name : '';
+            value = campaign.attributes.name || '';
             break;
             
           case 'status':
-            value = (campaign.attributes && campaign.attributes.status) ? campaign.attributes.status : '';
+            value = campaign.attributes.status || '';
             break;
             
           case 'created_at':
-            if (campaign.attributes && campaign.attributes.created_at) {
+            if (campaign.attributes.created_at) {
               try {
                 var date = new Date(campaign.attributes.created_at);
                 value = Utilities.formatDate(date, 'GMT', 'yyyyMMdd');
@@ -256,7 +254,7 @@ function getData(request) {
             break;
             
           case 'updated_at':
-            if (campaign.attributes && campaign.attributes.updated_at) {
+            if (campaign.attributes.updated_at) {
               try {
                 var date = new Date(campaign.attributes.updated_at);
                 value = Utilities.formatDate(date, 'GMT', 'yyyyMMdd');
@@ -267,7 +265,7 @@ function getData(request) {
             break;
             
           case 'send_time':
-            if (campaign.attributes && campaign.attributes.send_time) {
+            if (campaign.attributes.send_time) {
               try {
                 var date = new Date(campaign.attributes.send_time);
                 value = Utilities.formatDate(date, 'GMT', 'yyyyMMddHH');
@@ -275,6 +273,14 @@ function getData(request) {
                 value = '';
               }
             }
+            break;
+            
+          case 'subject':
+            value = (message && message.attributes && message.attributes.definition && message.attributes.definition.content && message.attributes.definition.content.subject) ? message.attributes.definition.content.subject : '';
+            break;
+            
+          case 'preview_text':
+            value = (message && message.attributes && message.attributes.definition && message.attributes.definition.content && message.attributes.definition.content.preview_text) ? message.attributes.definition.content.preview_text : '';
             break;
             
           default:
@@ -290,24 +296,14 @@ function getData(request) {
       });
     });
     
-    console.log('Filas creadas:', rows.length);
-    console.log('Primera fila:', JSON.stringify(rows[0]));
-    console.log('Schema retornado:', JSON.stringify(schema));
-    
-    // Retorno con schema estructurado correctamente
     var result = {
       schema: schema,
       rows: rows
     };
     
-    console.log('Resultado final (primeros 500 chars):', JSON.stringify(result).substring(0, 500));
-    
     return result;
     
   } catch (e) {
-    console.error('Error en getData:', e.toString());
-    
-    // En caso de error, retornar estructura válida
     var errorSchema = [];
     request.fields.forEach(function(field) {
       errorSchema.push({
