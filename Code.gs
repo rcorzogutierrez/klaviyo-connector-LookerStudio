@@ -141,6 +141,16 @@ function getSchema(request) {
     .setId('send_time')
     .setName('Send Time')
     .setType(types.YEAR_MONTH_DAY_HOUR);
+
+  fields.newDimension()
+  .setId('subject')
+  .setName('Subject')
+  .setType(types.TEXT);
+
+  fields.newDimension()
+    .setId('preview_text')
+    .setName('Preview Text')
+    .setType(types.TEXT);  
   
   return {
     'schema': fields.build()
@@ -173,9 +183,23 @@ function getData(request) {
   };
   
   try {
-    var response = UrlFetchApp.fetch(url, options);
-    
-    if (response.getResponseCode() !== 200) {
+    var allCampaigns = [];
+    var allIncluded = [];
+    var currentUrl = url;
+    var pageCount = 0;
+    var maxPages = 10;
+
+    while (currentUrl && pageCount < maxPages) {
+      var response = UrlFetchApp.fetch(currentUrl, options);
+      if (response.getResponseCode() !== 200) break;
+      var json = JSON.parse(response.getContentText());
+      allCampaigns = allCampaigns.concat(json.data);
+      if (json.included) allIncluded = allIncluded.concat(json.included); // Acumular included
+      currentUrl = json.links && json.links.next ? json.links.next : null;
+      pageCount++;
+    }
+
+    if (allCampaigns.length === 0) {
       var emptySchema = [];
       request.fields.forEach(function(field) {
         emptySchema.push({
@@ -188,23 +212,7 @@ function getData(request) {
         rows: []
       };
     }
-    
-    var json = JSON.parse(response.getContentText());
-    
-    if (!json.data || !Array.isArray(json.data)) {
-      var emptySchema = [];
-      request.fields.forEach(function(field) {
-        emptySchema.push({
-          name: field.name,
-          dataType: field.dataType || 'STRING'
-        });
-      });
-      return {
-        schema: emptySchema,
-        rows: []
-      };
-    }
-    
+
     var schema = [];
     request.fields.forEach(function(field) {
       schema.push({
@@ -215,13 +223,13 @@ function getData(request) {
     
     var rows = [];
     
-    json.data.forEach(function(campaign) {
+    allCampaigns.forEach(function(campaign) {
       var values = [];
       
       var message = null;
-      if (campaign.relationships && campaign.relationships['campaign-messages'] && campaign.relationships['campaign-messages'].data && json.included) {
+      if (campaign.relationships && campaign.relationships['campaign-messages'] && campaign.relationships['campaign-messages'].data && allIncluded.length > 0) {
         var messageId = campaign.relationships['campaign-messages'].data[0].id;
-        message = json.included.find(function(item) {
+        message = allIncluded.find(function(item) {
           return item.id === messageId && item.type === 'campaign-message';
         });
       }
